@@ -9,8 +9,8 @@
     var currentstateId = 0;
     var count = 0;
     document.addEventListener("DOMContentLoaded", function(event) { 
-      var socket = new WebSocket("ws://127.0.0.1:5000");
-      // var socket = new WebSocket("ws://nuclear.t.javascript.ninja");
+     // var socket = new WebSocket("ws://127.0.0.1:5000");
+      var socket = new WebSocket("ws://nuclear.t.javascript.ninja");
 
       socket.onopen = function() {
         alert("Соединение установлено.");
