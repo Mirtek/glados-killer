@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mew</title>
+</head>
+<body>
+  <script>
+    var currentstateId = 0;
+    var count = 0;
+    document.addEventListener("DOMContentLoaded", function(event) { 
+      var socket = new WebSocket("ws://127.0.0.1:5000");
+      // var socket = new WebSocket("ws://nuclear.t.javascript.ninja");
+
+      socket.onopen = function() {
+        alert("Соединение установлено.");
+      };  
+
+      var powerOff = function(cstateId){
+        var toSend = {
+          action : "powerOff",
+          stateId : cstateId
+        };
+        socket.send(JSON.stringify(toSend));
+      };
+
+      var compare = function(state, l1, l2){
+        var leverCheck = {
+          action: "check",
+          lever1: l1,
+          lever2: l2,
+          stateId: state
+        }
+
+        socket.send(JSON.stringify(leverCheck));
+
+      };
+
+      var responseTypeCheck = function(pull){
+        var responseType;
+        if (pull.action != undefined && pull.action === "check"){
+          if(pull.same === true){
+              responseType = {
+              action: 'check',
+              same: true,
+              lever1: pull.lever1,
+              lever2: pull.lever2,
+              stateId: pull.stateId 
+              }
+            return responseType
+          } else if (pull.same === false) {
+              responseType = { 
+              action: 'check',
+              same: false,
+              lever1: pull.lever1,
+              lever2: pull.lever2,
+              stateId: pull.stateId
+              }
+            return responseType
+          }
+
+        }
+
+        else if (pull.action === undefined && pull.pulled === 0 || pull.pulled === 1 || pull.pulled === 2 || pull.pulled === 3) {
+           responseType = {
+            action: 'pulled',
+            leverpulled: pull.pulled,
+            stateId: pull.stateId
+           }
+          return responseType
+        }
+        else if (pull.newState != undefined){
+          responseType = {
+            action: 'newState',
+            state: pull.newState,
+            stateId: pull.stateId
+          }
+          return responseType
+        }
+
+      };
+
+
+      var prevStateId;
+      var currstate;
+      var prevCheckData;
+
+      var saveddata = function(pull){
+        return pull;
+      };
+
+      var pullStored;
+      var leverSaved;
+      var leverSaved2;
+
+      var lever_values = [0, 0, 0, 0];
+      var stateChangedStillWorking=false;
+
+      socket.onmessage = function(event){
+        pull = JSON.parse(event.data);
+        console.log(pull);
+
+        if (pull.newState === undefined && !stateChangedStillWorking){
+          firstpull(event);
+        } 
+        else if (pull.newState === 'poweredOn'){
+          console.log('machine is still working');
+          var p = document.getElementById('state_of_machine');
+          p.innerHTML = p.innerHTML + 'Machine is still working, try unsuccesfull ';
+          stateChangedStillWorking=true;
+        }
+        else if (stateChangedStillWorking) {
+          secondpull(event);
+          console.log('work, again, master');
+        } 
+        else if (pull.newState === 'poweredOff'){
+          console.log('machine is dead');
+          var p = document.getElementById('state_of_machine');
+          p.innerHTML = p.innerHTML + '<br> Machine is dead, well played ';
+          p.innerHTML = p.innerHTML + '<br> Time to turn off the client, well done btw here is the token - ' + pull.token;    
+          socket.onclose = function () {}; // disable onclose handler first
+          socket.close();
+        } 
+
+
+
+
+      }
+
+      var secondpull = function(event){
+
+         pull = JSON.parse(event.data);
+         console.log(pull);
+
+         if (pull.newState === 'poweredOff'){
+          console.log('i guess were done');
+          var p = document.getElementById('state_of_machine');
+          p.innerHTML = p.innerHTML + '<br> Machine is dead, well played ';
+          p.innerHTML = p.innerHTML + '<br> Time to turn off the client, well done btw here is the token - ' + pull.token;    
+          socket.onclose = function () {}; // disable onclose handler first
+          socket.close(); 
+         }
+
+         console.log('in secondpull subroutine');
+         // pull = JSON.parse(event.data);
+         // console.log(pull);
+         console.log(lever_values);
+
+         var checkdata = responseTypeCheck(pull);
+         console.log(JSON.stringify(checkdata) + " checkdata value of secondpull");
+        
+         if (checkdata.action === 'pulled'){ 
+           if (lever_values[checkdata.leverpulled] === 0){
+             lever_values[checkdata.leverpulled]=1;            
+           } else if (lever_values[checkdata.leverpulled] === 1){
+             lever_values[checkdata.leverpulled]=0;
+           }
+         }
+
+         if (lever_values[0] === 1 && lever_values[1] === 1 && lever_values[2] === 1 && lever_values[3] === 1) {
+           powerOff(pull.stateId);
+           console.log('powering off in secondpull subroutine');
+         }
+
+         console.log(lever_values);
+
+
+
+
+      } 
+
+      var firstpull = function(event){
+
+        pull = JSON.parse(event.data);
+        console.log(pull);
+
+         var checkdata = responseTypeCheck(pull);
+         console.log(JSON.stringify(checkdata) + " checkdata value");
+
+      //   powerOff(pull.stateId);
+         // if (checkdata.action === 'newState') {
+         //  if (checkdata.state === 'poweredOn') {
+         //   console.log('machine is still working');
+         //   var p = document.getElementById('state_of_machine');
+         //   p.innerHTML = p.innerHTML + 'Machine is still working, try unsuccesfull';
+         //   // if first try is unsuccesfull - that means values were 1111
+         //   // and we can assume that and just wait for 0000 and do a second pull
+         //   secondpull(event);
+         //  } else if (checkdata.state === 'poweredOff'){
+         //   console.log('machine powered off ');
+         //   var p = document.getElementById('state_of_machine');
+         //   p.innerHTML = p.innerHTML + 'Machine is turned off, well played';
+         //  }
+
+         // } 
+
+
+
+         if (checkdata.action === 'pulled'){
+          if (pullStored != undefined && pull.stateId === pullStored.stateId+1 && pull.pulled!=0 && pull.pulled!=1 && pull.pulled !=2 && leverSaved != undefined && leverSaved === 1 ){
+            compare(pull.stateId, 2, 3);
+            console.log('comparing 23');
+          } else if (pullStored != undefined && pull.stateId === pullStored.stateId+1 && pull.pulled!=0 && pull.pulled!=1 && leverSaved != undefined && leverSaved===0){
+            compare(pull.stateId, 1, 2);
+            console.log('comparing 12');
+          } else {
+            compare(pull.stateId, 0, 1);
+            console.log('comparing 01');
+          }
+         }
+         if (checkdata.action === 'check' && checkdata.same){
+          if (pull.lever1 == 2 && pull.lever2 === 3){
+            console.log('first send of powerOff command, wish me luck');
+            powerOff(pull.stateId);
+          }
+
+          pullStored = saveddata(pull);
+          leverSaved = pull.lever1;
+          leverSaved2 = pull.lever2;
+          console.log('waiting next state id');          
+         }
+
+
+         
+
+
+      };
+
+
+
+  });
+
+
+
+</script>
+
+<h1>Glados killer</h1>
+<p id="state_of_machine"></p>
+
+</body>
+</html>
+
